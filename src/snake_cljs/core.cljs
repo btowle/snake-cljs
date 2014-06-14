@@ -14,13 +14,6 @@
 ;;JS interop
 (enable-console-print!)
 
-#_(defn canvas []
-  (let [canvas (dom/getElement "canvas")]
-    {:canvas canvas
-     :context (.getContext canvas "2d")
-     :width (. canvas -width)
-     :height (. canvas -height)}))
-
 (defn canvas []
   (let [container (dom/getElement "canvas-container")
         canvas (dom/htmlToDocumentFragment
@@ -82,8 +75,12 @@
     (draw-box canvas x y grid-size grid-size)))
 
 (defn draw-snake [state canvas]
-    (set-fill-color canvas 0 0 255)
-    (doall (map (partial draw-snake-segment canvas) (:body (:snake state)))))
+  (let [snake (:snake state)
+        body (:body snake)]
+    (if (:alive? state)
+      (set-fill-color canvas 0 0 255)
+      (set-fill-color canvas 255 0 0))
+    (doall (map (partial draw-snake-segment canvas) (:body (:snake state))))))
 
 (defn render [state canvas]
   (clear-canvas canvas)
@@ -116,15 +113,28 @@
   {:up (fn [[x y] coordinate] [x (- y 1)])
    :right (fn [[x y] coordinate] [(+ x 1) y])
    :down (fn [[x y] coordinate] [x (+ y 1)])
-   :left (fn [[x y] coordinate] [(- x 1) y])})
+   :left (fn [[x y] coordinate] [(- x 1) y])
+   :none identity})
 
-(defn move-snake [snake direction]
-  (let [body (:body snake)]
-    (assoc snake :body (map (direction-fns direction) body))))
+(defn check-collision [state]
+  (let [body (:body (:snake state))
+        head (first body)
+        x (first head)
+        y (last head)
+        max-x (:width (:map-size state))
+        max-y (:height (:map-size state))]
+    (assoc state :alive? (and (>= x 0) (>= y 0) (< x max-x) (< y max-y)))))
+
+(defn move-snake [state]
+  (let [body (:body (:snake state))
+        direction (:direction state)
+        new-body (map (direction-fns direction) body)
+        state (assoc state :snake (assoc (:snake state) :body new-body))]
+    (check-collision state)))
 
 (defn update-board [state canvas]
-  (let [state (assoc state :snake (move-snake (:snake state) (:direction state))
-                           :time (assoc (:time state) :last-update 0))]
+  (let [state (assoc (move-snake state)
+                     :time (assoc (:time state) :last-update 0))]
     (render state canvas)
     state))
 
@@ -133,17 +143,18 @@
    :body [[(/ grid-width 2) (/ grid-height 2)]]})
 
 (defn initial-state []
-  (let [grid-width (/ (- canvas-width border-width) grid-size)
-        grid-height (/ (- canvas-height border-width) grid-size)]
+  (let [grid-width (/ (- canvas-width (* 2 border-width)) grid-size)
+        grid-height (/ (- canvas-height (* 2 border-width)) grid-size)]
     {:time (get-time)
      :map-size {:width grid-width
                 :height grid-height}
      :snake (snake grid-width grid-height)
-     :direction :right}))
+     :direction :none
+     :alive? true}))
 
 (defn on-tick [state canvas]
   (swap! state update-time)
-  (if (> (:last-update (:time @state)) update-latency)
+  (if (and (:alive? @state) (> (:last-update (:time @state)) update-latency))
     (swap! state update-board canvas)))
 
 (defn on-keydown [state canvas event]
@@ -152,8 +163,6 @@
                           39 :right 68 :right 102 :right
                           40 :down  83 :down  98 :down}
         key-code (. event -keyCode)]
-    (println key-code)
-    (println key-to-direction)
     (swap! state assoc :direction (key-to-direction key-code))))
 
 (defn ^:export init []
