@@ -132,10 +132,9 @@
         state (assoc state :snake (assoc (:snake state) :body new-body))]
     (check-collision state)))
 
-(defn update-board [state canvas]
+(defn update-board [state]
   (let [state (assoc (move-snake state)
                      :time (assoc (:time state) :last-update 0))]
-    (render state canvas)
     state))
 
 (defn snake [grid-width grid-height]
@@ -155,7 +154,8 @@
 (defn on-tick [state canvas]
   (swap! state update-time)
   (if (and (:alive? @state) (> (:last-update (:time @state)) update-latency))
-    (swap! state update-board canvas)))
+    (swap! state update-board)
+    (render @state canvas)))
 
 (defn on-keydown [state canvas event]
   (let [key-to-direction {37 :left  65 :left  100 :left
