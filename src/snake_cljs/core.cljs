@@ -9,6 +9,7 @@
 (def ^:const border-width 32)
 (def ^:const canvas-width 640)
 (def ^:const canvas-height 480)
+(def ^:const update-latency 250)
 
 ;;JS interop
 (enable-console-print!)
@@ -25,7 +26,8 @@
         canvas (dom/htmlToDocumentFragment
                             (str "<canvas id='canvas' "
                             "width='" canvas-width "' "
-                            "height='" canvas-height
+                            "height='" canvas-height "' "
+                            "tabindex='1'" ;;hack for keydown events
                             "'></canvas>"))]
     (dom/append container canvas)
     {:canvas canvas
@@ -81,16 +83,14 @@
 
 (defn draw-snake [state canvas]
     (set-fill-color canvas 0 0 255)
-    (doall (map (partial draw-snake-segment canvas) (:body (:snake state))))
-  )
+    (doall (map (partial draw-snake-segment canvas) (:body (:snake state)))))
 
 (defn render [state canvas]
   (clear-canvas canvas)
   (draw-board canvas)
   #_(draw-fps state canvas)
   ;;(draw-score state canvas)
-  (draw-snake state canvas)
-  )
+  (draw-snake state canvas))
 
 ;;Timer
 (defn get-time
@@ -112,24 +112,49 @@
   (assoc state :time (get-time (:time state))))
 
 ;;Game
-(defn update-board [state canvas]
-  (render state canvas)
-  state)
+(def direction-fns
+  {:up (fn [[x y] coordinate] [x (- y 1)])
+   :right (fn [[x y] coordinate] [(+ x 1) y])
+   :down (fn [[x y] coordinate] [x (+ y 1)])
+   :left (fn [[x y] coordinate] [(- x 1) y])})
 
-(defn snake []
+(defn move-snake [snake direction]
+  (let [body (:body snake)]
+    (assoc snake :body (map (direction-fns direction) body))))
+
+(defn update-board [state canvas]
+  (let [state (assoc state :snake (move-snake (:snake state) (:direction state))
+                           :time (assoc (:time state) :last-update 0))]
+    (render state canvas)
+    state))
+
+(defn snake [grid-width grid-height]
   {:growth 0
-   :body [[2 2]]})
+   :body [[(/ grid-width 2) (/ grid-height 2)]]})
 
 (defn initial-state []
-  {:time (get-time)
-   :map-size {:width (/ (- canvas-width border-width) grid-size)
-              :height (/ (- canvas-height border-width) grid-size)}
-   :snake (snake)})
+  (let [grid-width (/ (- canvas-width border-width) grid-size)
+        grid-height (/ (- canvas-height border-width) grid-size)]
+    {:time (get-time)
+     :map-size {:width grid-width
+                :height grid-height}
+     :snake (snake grid-width grid-height)
+     :direction :right}))
 
 (defn on-tick [state canvas]
   (swap! state update-time)
-  (if (> (:last-update (:time @state)) 100)
+  (if (> (:last-update (:time @state)) update-latency)
     (swap! state update-board canvas)))
+
+(defn on-keydown [state canvas event]
+  (let [key-to-direction {37 :left  65 :left  100 :left
+                          38 :up    87 :up    104 :up
+                          39 :right 68 :right 102 :right
+                          40 :down  83 :down  98 :down}
+        key-code (. event -keyCode)]
+    (println key-code)
+    (println key-to-direction)
+    (swap! state assoc :direction (key-to-direction key-code))))
 
 (defn ^:export init []
   (let [canvas (canvas)
@@ -138,4 +163,7 @@
     (. timer start)
     (events/listen timer
                    goog.Timer/TICK
-                   #(on-tick state canvas))))
+                   #(on-tick state canvas))
+    (events/listen (:canvas canvas)
+                   event-type/KEYDOWN
+                   #(on-keydown state canvas %))))
