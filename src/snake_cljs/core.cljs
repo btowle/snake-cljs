@@ -70,6 +70,12 @@
     (set! (. ctx -font) "bold 12px sans-serif")
     (.fillText ctx (str "fps: " (:fps (:time state))) 0 10)))
 
+(defn draw-score [state canvas]
+  (let [ctx (:context canvas)]
+    (set-fill-color canvas 255 255 255)
+    (set! (. ctx -font) "bold 12px sans-serif")
+    (.fillText ctx (str "Score: " (:length (:snake state))) 0 10)))
+
 (defn draw-snake-segment [canvas segment]
   (let [[x y] (screen-coordinates segment)]
     (draw-box canvas x y grid-size grid-size)))
@@ -85,8 +91,7 @@
 (defn render [state canvas]
   (clear-canvas canvas)
   (draw-board canvas)
-  #_(draw-fps state canvas)
-  ;;(draw-score state canvas)
+  (draw-score state canvas)
   (draw-snake state canvas))
 
 ;;Timer
@@ -164,6 +169,7 @@
      :direction :none
      :alive? true}))
 
+;;Gameloop/Events
 (defn on-tick [state canvas]
   (swap! state update-time)
   (if (and (:alive? @state) (> (:last-update (:time @state)) update-latency))
