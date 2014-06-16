@@ -108,6 +108,9 @@
 (defn update-time [state]
   (assoc state :time (get-time (:time state))))
 
+(defn zero-last-update [state]
+  (assoc state :time (assoc (:time state) :last-update 0)))
+
 ;;Game
 (def direction-fns
   {:up (fn [[x y] coordinate] [x (- y 1)])
@@ -126,19 +129,29 @@
     (assoc state :alive? (and (>= x 0) (>= y 0) (< x max-x) (< y max-y)))))
 
 (defn move-snake [state]
-  (let [body (:body (:snake state))
+  (let [snake (:snake state)
+        body (:body snake)
         direction (:direction state)
-        new-body (map (direction-fns direction) body)
-        state (assoc state :snake (assoc (:snake state) :body new-body))]
-    (check-collision state)))
+        new-head ((direction-fns direction) (first body))]
+    (if (= direction :none)
+      state
+      (if (> (:growth snake) 0)
+        (assoc state :snake (assoc snake
+                                   :body (cons new-head body)
+                                   :growth (- (:growth snake) 1)
+                                   :length (+ (:length snake) 1)))
+        (assoc state :snake (assoc snake
+                                   :body (cons new-head (butlast body))))))))
 
 (defn update-board [state]
-  (let [state (assoc (move-snake state)
-                     :time (assoc (:time state) :last-update 0))]
-    state))
+  (-> state
+      zero-last-update
+      move-snake
+      check-collision))
 
 (defn snake [grid-width grid-height]
-  {:growth 0
+  {:growth 4
+   :length 1
    :body [[(/ grid-width 2) (/ grid-height 2)]]})
 
 (defn initial-state []
