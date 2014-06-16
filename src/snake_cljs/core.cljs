@@ -124,14 +124,18 @@
    :left (fn [[x y] coordinate] [(- x 1) y])
    :none identity})
 
+(defn collide-wall? [state]
+  (let [body (-> state :snake :body)
+        [x y] (first body)
+        {:keys [width height]} (:map-size state)]
+    (or (< x 0) (< y 0) (>= x width) (>= y height))))
+
+(defn collide-self? [state]
+  (let [body (-> state :snake :body)]
+    (seq (filter #(= (first body) %) (rest body)))))
+
 (defn check-collision [state]
-  (let [body (:body (:snake state))
-        head (first body)
-        x (first head)
-        y (last head)
-        max-x (:width (:map-size state))
-        max-y (:height (:map-size state))]
-    (assoc state :alive? (and (>= x 0) (>= y 0) (< x max-x) (< y max-y)))))
+  (assoc state :alive? (not (or (collide-wall? state) (collide-self? state)))))
 
 (defn move-snake [state]
   (let [snake (:snake state)
