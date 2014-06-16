@@ -49,7 +49,10 @@
   ([canvas x y w h]
     (.fillRect (:context canvas) x y w h))
   ([canvas x y w]
-    (draw-box x y w w)))
+    (draw-box canvas x y w w))
+  ([canvas box]
+    (let [[x y w h] box]
+      (draw-box canvas x y w h))))
 
 ;;Game Drawing
 (defn screen-coordinates [grid-size border-width game-coordinates]
@@ -59,10 +62,11 @@
   [canvas]
   (let [{:keys [height width border-width]} canvas]
     (set-fill-color canvas (color :blue :dark))
-    (draw-box canvas 0 0 width border-width)
-    (draw-box canvas 0 0 border-width height)
-    (draw-box canvas 0 (- height border-width) width border-width)
-    (draw-box canvas (- width border-width) 0 border-width height)))
+    (doall (map (partial draw-box canvas)
+                [[0 0 width border-width]
+                 [0 0 border-width height]
+                 [0 (- height border-width) width border-width]
+                 [(- width border-width) 0 border-width height]]))))
 
 (defn draw-score [state canvas]
   (let [ctx (:context canvas)]
