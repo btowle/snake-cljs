@@ -9,7 +9,10 @@
 (def ^:const border-width 32)
 (def ^:const canvas-width 640)
 (def ^:const canvas-height 480)
-(def ^:const update-latency 250)
+
+(def ^:const update-latency 50)
+(def ^:const growth-per-pellet 5)
+(def ^:const initial-length 5)
 
 ;;JS interop
 (enable-console-print!)
@@ -151,7 +154,7 @@
         {:keys [width height]} (:map-size state)]
     (if (collide-pellet? state)
         (assoc state
-               :snake (assoc snake :growth (+ (:growth snake) 1))
+               :snake (assoc snake :growth (+ (:growth snake) growth-per-pellet))
                :pellet (pellet snake width height))
         state)))
 
@@ -181,7 +184,7 @@
       check-collision))
 
 (defn snake [grid-width grid-height]
-  {:growth 4
+  {:growth (- initial-length 1)
    :last-last [0 0]
    :length 1
    :body [[(/ grid-width 2) (/ grid-height 2)]]})
