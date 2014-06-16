@@ -34,9 +34,6 @@
   ([r g b]
    (rgba-string r g b 255)))
 
-(defn clear-canvas [canvas]
-  (.clearRect (:context canvas) 0 0 (:width canvas) (:height canvas)))
-
 (defn set-fill-color
   ([canvas rgba]
     (set! (. (:context canvas) -fillStyle) rgba))
@@ -57,18 +54,12 @@
 
 (defn draw-board
   [canvas]
-  (set-fill-color canvas 0 0 100)
-  (draw-box canvas 0 0 (:width canvas) (:height canvas))
-  (.clearRect (:context canvas)
-              border-width border-width
-              (- (:width canvas) (* border-width 2))
-              (- (:height canvas) (* border-width 2))))
-
-(defn draw-fps [state canvas]
-  (let [ctx (:context canvas)]
-    (set-fill-color canvas 255 255 255)
-    (set! (. ctx -font) "bold 12px sans-serif")
-    (.fillText ctx (str "fps: " (:fps (:time state))) 0 22)))
+  (let [{:keys [height width]} canvas]
+    (set-fill-color canvas 0 0 100)
+    (draw-box canvas 0 0 width border-width)
+    (draw-box canvas 0 0 border-width height)
+    (draw-box canvas 0 (- height border-width) width border-width)
+    (draw-box canvas (- width border-width) 0 border-width height)))
 
 (defn draw-score [state canvas]
   (let [ctx (:context canvas)]
@@ -84,9 +75,13 @@
   (let [snake (:snake state)
         body (:body snake)]
     (if (:alive? state)
-      (set-fill-color canvas 0 0 255)
-      (set-fill-color canvas 255 0 0))
-    (doall (map (partial draw-snake-segment canvas) (:body (:snake state))))))
+      (do (set-fill-color canvas 0 0 255)
+          (draw-snake-segment canvas (first body)))
+      (do
+        (set-fill-color canvas 255 0 0)
+        (doall (map (partial draw-snake-segment canvas) body))))
+    (set-fill-color canvas 255 255 255)
+    (draw-snake-segment canvas (:last-last snake))))
 
 (defn draw-pellet [state canvas]
   (let [[x y] (-> state :pellet screen-coordinates)]
@@ -94,10 +89,8 @@
     (draw-box canvas x y grid-size grid-size)))
 
 (defn render [state canvas]
-  (clear-canvas canvas)
   (draw-board canvas)
   (draw-score state canvas)
-  (draw-fps state canvas)
   (draw-snake state canvas)
   (draw-pellet state canvas))
 
@@ -109,13 +102,11 @@
           last-update (+ (:last-update old-time) delta)]
       {:wall now
        :delta delta
-       :last-update last-update
-       :fps (/ 1000 delta)}))
+       :last-update last-update}))
   ([]
     (get-time {:wall (.getTime (js/Date.))
                :delta 0
-               :last-update 0
-               :fps 0})))
+               :last-update 0})))
 
 (defn update-time [state]
   (assoc state :time (get-time (:time state))))
@@ -180,7 +171,8 @@
                                    :growth (- (:growth snake) 1)
                                    :length (+ (:length snake) 1)))
         (assoc state :snake (assoc snake
-                                   :body (cons new-head (butlast body))))))))
+                                   :body (cons new-head (butlast body))
+                                   :last-last (last body)))))))
 
 (defn update-board [state]
   (-> state
@@ -190,6 +182,7 @@
 
 (defn snake [grid-width grid-height]
   {:growth 4
+   :last-last [0 0]
    :length 1
    :body [[(/ grid-width 2) (/ grid-height 2)]]})
 
@@ -209,8 +202,9 @@
 (defn on-tick [state canvas]
   (swap! state update-time)
   (if (and (:alive? @state) (> (:last-update (:time @state)) update-latency))
-    (swap! state update-board))
-  (render @state canvas))
+    (do
+      (swap! state update-board)
+      (render @state canvas))))
 
 (defn on-keydown [state canvas event]
   (let [key-to-direction {37 :left  65 :left  100 :left
