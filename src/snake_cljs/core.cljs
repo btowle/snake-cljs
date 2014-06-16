@@ -1,101 +1,19 @@
 (ns snake-cljs.core
-  (:require [clojure.string :as string]
-            [goog.dom :as dom]
-            [goog.Timer :as timer]
+  (:require [goog.Timer :as timer]
             [goog.events :as events]
-            [goog.events.EventType :as event-type]))
+            [goog.events.EventType :as event-type]
+            [snake-cljs.rendering :refer [canvas render]]))
 
-(def ^:const grid-size 8)
-(def ^:const border-width 32)
 (def ^:const canvas-width 640)
 (def ^:const canvas-height 480)
+(def ^:const grid-size 8)
+(def ^:const border-width 32)
 
 (def ^:const update-latency 50)
 (def ^:const growth-per-pellet 5)
 (def ^:const initial-length 5)
 
-;;JS interop
 (enable-console-print!)
-
-(defn canvas []
-  (let [container (dom/getElement "canvas-container")
-        canvas (dom/htmlToDocumentFragment
-                            (str "<canvas id='canvas' "
-                            "width='" canvas-width "' "
-                            "height='" canvas-height "' "
-                            "tabindex='1'" ;;hack for keydown events
-                            "'></canvas>"))]
-    (dom/append container canvas)
-    {:canvas canvas
-     :context (.getContext canvas "2d")
-     :width (. canvas -width)
-     :height (. canvas -height)}))
-
-(defn rgba-string
-  ([r g b a]
-    (str "rgba(" (string/join "," [r g b a]) ")"))
-  ([r g b]
-   (rgba-string r g b 255)))
-
-(defn set-fill-color
-  ([canvas rgba]
-    (set! (. (:context canvas) -fillStyle) rgba))
-  ([canvas r g b & a]
-    (if (nil? a)
-      (set-fill-color canvas (rgba-string r g b))
-      (set-fill-color canvas (rgba-string r g b (first a))))))
-
-(defn draw-box
-  ([canvas x y w h]
-    (.fillRect (:context canvas) x y w h))
-  ([canvas x y w]
-    (draw-box x y w w)))
-
-;;Game Drawing
-(defn screen-coordinates [game-coordinates]
-  (map #(+ border-width (* grid-size %)) game-coordinates))
-
-(defn draw-board
-  [canvas]
-  (let [{:keys [height width]} canvas]
-    (set-fill-color canvas 0 0 100)
-    (draw-box canvas 0 0 width border-width)
-    (draw-box canvas 0 0 border-width height)
-    (draw-box canvas 0 (- height border-width) width border-width)
-    (draw-box canvas (- width border-width) 0 border-width height)))
-
-(defn draw-score [state canvas]
-  (let [ctx (:context canvas)]
-    (set-fill-color canvas 255 255 255)
-    (set! (. ctx -font) "bold 12px sans-serif")
-    (.fillText ctx (str "Score: " (:length (:snake state))) 0 10)))
-
-(defn draw-snake-segment [canvas segment]
-  (let [[x y] (screen-coordinates segment)]
-    (draw-box canvas x y grid-size grid-size)))
-
-(defn draw-snake [state canvas]
-  (let [snake (:snake state)
-        body (:body snake)]
-    (if (:alive? state)
-      (do (set-fill-color canvas 0 0 255)
-          (draw-snake-segment canvas (first body)))
-      (do
-        (set-fill-color canvas 255 0 0)
-        (doall (map (partial draw-snake-segment canvas) body))))
-    (set-fill-color canvas 255 255 255)
-    (draw-snake-segment canvas (:last-last snake))))
-
-(defn draw-pellet [state canvas]
-  (let [[x y] (-> state :pellet screen-coordinates)]
-    (set-fill-color canvas 0 255 0)
-    (draw-box canvas x y grid-size grid-size)))
-
-(defn render [state canvas]
-  (draw-board canvas)
-  (draw-score state canvas)
-  (draw-snake state canvas)
-  (draw-pellet state canvas))
 
 ;;Timer
 (defn get-time
@@ -118,13 +36,6 @@
   (assoc state :time (assoc (:time state) :last-update 0)))
 
 ;;Game
-(def direction-fns
-  {:up (fn [[x y] coordinate] [x (- y 1)])
-   :right (fn [[x y] coordinate] [(+ x 1) y])
-   :down (fn [[x y] coordinate] [x (+ y 1)])
-   :left (fn [[x y] coordinate] [(- x 1) y])
-   :none identity})
-
 (defn collide-wall? [state]
   (let [body (-> state :snake :body)
         [x y] (first body)
@@ -158,8 +69,12 @@
                :pellet (pellet snake width height))
         state)))
 
-(defn check-collision [state]
-  (-> state die-on-collision eat-pellet))
+(def direction-fns
+  {:up (fn [[x y] coordinate] [x (- y 1)])
+   :right (fn [[x y] coordinate] [(+ x 1) y])
+   :down (fn [[x y] coordinate] [x (+ y 1)])
+   :left (fn [[x y] coordinate] [(- x 1) y])
+   :none identity})
 
 (defn move-snake [state]
   (let [snake (:snake state)
@@ -181,7 +96,8 @@
   (-> state
       zero-last-update
       move-snake
-      check-collision))
+      die-on-collision
+      eat-pellet))
 
 (defn snake [grid-width grid-height]
   {:growth (- initial-length 1)
@@ -219,7 +135,7 @@
                                       (:direction @state)))))
 
 (defn ^:export init []
-  (let [canvas (canvas)
+  (let [canvas (canvas canvas-width canvas-height grid-size border-width)
         timer (goog.Timer. (/ 1000 250))
         state (atom (initial-state))]
     (. timer start)
