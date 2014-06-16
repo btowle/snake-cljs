@@ -87,9 +87,11 @@
         (assoc state :snake (assoc snake
                                    :body (cons new-head body)
                                    :growth (- (:growth snake) 1)
-                                   :length (+ (:length snake) 1)))
+                                   :length (+ (:length snake) 1)
+                                   :grew? true))
         (assoc state :snake (assoc snake
                                    :body (cons new-head (butlast body))
+                                   :grew? false
                                    :last-last (last body)))))))
 
 (defn update-board [state]
@@ -102,6 +104,7 @@
 (defn snake [grid-width grid-height]
   {:growth (- initial-length 1)
    :last-last [0 0]
+   :grew? true
    :length 1
    :body [[(/ grid-width 2) (/ grid-height 2)]]})
 

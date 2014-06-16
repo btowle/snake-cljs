@@ -66,14 +66,16 @@
 (defn draw-snake [state canvas]
   (let [snake (:snake state)
         body (:body snake)]
+    (if (not (:grew? snake))
+      (do
+        (set-fill-color canvas 255 255 255)
+        (draw-snake-segment canvas (:last-last snake))))
     (if (:alive? state)
       (do (set-fill-color canvas 0 0 255)
           (draw-snake-segment canvas (first body)))
       (do
         (set-fill-color canvas 255 0 0)
-        (doall (map (partial draw-snake-segment canvas) body))))
-    (set-fill-color canvas 255 255 255)
-    (draw-snake-segment canvas (:last-last snake))))
+        (doall (map (partial draw-snake-segment canvas) body))))))
 
 (defn draw-pellet [state canvas]
   (let [{:keys [grid-size border-width]} canvas
