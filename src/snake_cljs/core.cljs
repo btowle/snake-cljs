@@ -186,7 +186,8 @@
                           39 :right 68 :right 102 :right
                           40 :down  83 :down  98 :down}
         key-code (. event -keyCode)]
-    (swap! state assoc :direction (key-to-direction key-code))))
+    (swap! state assoc :direction (or (key-to-direction key-code)
+                                      (:direction @state)))))
 
 (defn ^:export init []
   (let [canvas (canvas)
