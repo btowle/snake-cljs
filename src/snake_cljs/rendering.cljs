@@ -23,7 +23,19 @@
   ([r g b a]
     (str "rgba(" (string/join "," [r g b a]) ")"))
   ([r g b]
-   (rgba-string r g b 255)))
+    (rgba-string r g b 255))
+  ([value-list]
+    (let [[r g b a] value-list]
+      (rgba-string r g b (or a 255)))))
+
+(defn color [color-name & modifiers]
+  (let [value (if (some #(= :dark %) modifiers) 100 255)
+        colors {:black '(0 0 0)
+                :white '(1 1 1)
+                :red   '(1 0 0)
+                :green '(0 1 0)
+                :blue  '(0 0 1)}]
+    (rgba-string (map #(* value %) (colors color-name)))))
 
 (defn set-fill-color
   ([canvas rgba]
@@ -46,7 +58,7 @@
 (defn draw-board
   [canvas]
   (let [{:keys [height width border-width]} canvas]
-    (set-fill-color canvas 0 0 100)
+    (set-fill-color canvas (color :blue :dark))
     (draw-box canvas 0 0 width border-width)
     (draw-box canvas 0 0 border-width height)
     (draw-box canvas 0 (- height border-width) width border-width)
@@ -54,7 +66,7 @@
 
 (defn draw-score [state canvas]
   (let [ctx (:context canvas)]
-    (set-fill-color canvas 255 255 255)
+    (set-fill-color canvas (color :white))
     (set! (. ctx -font) "bold 12px sans-serif")
     (.fillText ctx (str "Score: " (:length (:snake state))) 0 10)))
 
@@ -68,19 +80,19 @@
         body (:body snake)]
     (if (not (:grew? snake))
       (do
-        (set-fill-color canvas 255 255 255)
+        (set-fill-color canvas (color :white))
         (draw-snake-segment canvas (:last-last snake))))
     (if (:alive? state)
-      (do (set-fill-color canvas 0 0 255)
+      (do (set-fill-color canvas (color :blue))
           (draw-snake-segment canvas (first body)))
       (do
-        (set-fill-color canvas 255 0 0)
+        (set-fill-color canvas (color :red))
         (doall (map (partial draw-snake-segment canvas) body))))))
 
 (defn draw-pellet [state canvas]
   (let [{:keys [grid-size border-width]} canvas
         [x y] (screen-coordinates grid-size border-width (:pellet state))]
-    (set-fill-color canvas 0 255 0)
+    (set-fill-color canvas (color :green))
     (draw-box canvas x y grid-size grid-size)))
 
 (defn render [state canvas]
