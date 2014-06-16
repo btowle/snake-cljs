@@ -48,8 +48,8 @@
 (defn draw-box
   ([canvas x y w h]
     (.fillRect (:context canvas) x y w h))
-  ([canvas {:keys [x y width height]}]
-    (draw-box x y width height)))
+  ([canvas x y w]
+    (draw-box x y w w)))
 
 ;;Game Drawing
 (defn screen-coordinates [game-coordinates]
@@ -68,7 +68,7 @@
   (let [ctx (:context canvas)]
     (set-fill-color canvas 255 255 255)
     (set! (. ctx -font) "bold 12px sans-serif")
-    (.fillText ctx (str "fps: " (:fps (:time state))) 0 10)))
+    (.fillText ctx (str "fps: " (:fps (:time state))) 0 22)))
 
 (defn draw-score [state canvas]
   (let [ctx (:context canvas)]
@@ -88,11 +88,18 @@
       (set-fill-color canvas 255 0 0))
     (doall (map (partial draw-snake-segment canvas) (:body (:snake state))))))
 
+(defn draw-pellet [state canvas]
+  (let [[x y] (-> state :pellet screen-coordinates)]
+    (set-fill-color canvas 0 255 0)
+    (draw-box canvas x y grid-size grid-size)))
+
 (defn render [state canvas]
   (clear-canvas canvas)
   (draw-board canvas)
   (draw-score state canvas)
-  (draw-snake state canvas))
+  (draw-fps state canvas)
+  (draw-snake state canvas)
+  (draw-pellet state canvas))
 
 ;;Timer
 (defn get-time
@@ -132,10 +139,33 @@
 
 (defn collide-self? [state]
   (let [body (-> state :snake :body)]
-    (seq (filter #(= (first body) %) (rest body)))))
+    (some #(= (first body) %) (rest body))))
+
+(defn die-on-collision [state]
+  (assoc state :alive? (not (or (collide-wall? state) (collide-self? state)))))
+
+(defn valid-pellet [grid-width grid-height snake pellet]
+  (not-any? #(= pellet %) (:body snake)))
+
+(defn pellet [snake grid-width grid-height]
+  (first (filter (partial valid-pellet grid-width grid-height snake)
+                 (repeatedly #(vector (rand-int grid-width)
+                                      (rand-int grid-height))))))
+
+(defn collide-pellet? [state]
+  (= (-> state :snake :body first) (:pellet state)))
+
+(defn eat-pellet [state]
+  (let [snake (:snake state)
+        {:keys [width height]} (:map-size state)]
+    (if (collide-pellet? state)
+        (assoc state
+               :snake (assoc snake :growth (+ (:growth snake) 1))
+               :pellet (pellet snake width height))
+        state)))
 
 (defn check-collision [state]
-  (assoc state :alive? (not (or (collide-wall? state) (collide-self? state)))))
+  (-> state die-on-collision eat-pellet))
 
 (defn move-snake [state]
   (let [snake (:snake state)
@@ -165,11 +195,13 @@
 
 (defn initial-state []
   (let [grid-width (/ (- canvas-width (* 2 border-width)) grid-size)
-        grid-height (/ (- canvas-height (* 2 border-width)) grid-size)]
+        grid-height (/ (- canvas-height (* 2 border-width)) grid-size)
+        snake (snake grid-width grid-height)]
     {:time (get-time)
      :map-size {:width grid-width
                 :height grid-height}
-     :snake (snake grid-width grid-height)
+     :snake snake
+     :pellet (pellet snake grid-width grid-height)
      :direction :none
      :alive? true}))
 
@@ -177,8 +209,8 @@
 (defn on-tick [state canvas]
   (swap! state update-time)
   (if (and (:alive? @state) (> (:last-update (:time @state)) update-latency))
-    (swap! state update-board)
-    (render @state canvas)))
+    (swap! state update-board))
+  (render @state canvas))
 
 (defn on-keydown [state canvas event]
   (let [key-to-direction {37 :left  65 :left  100 :left
