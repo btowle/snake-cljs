@@ -2,6 +2,8 @@
   (:require [clojure.string :as string]
             [goog.dom :as dom]))
 
+(def default-font "bold 12px sans-serif")
+
 ;;JS interop
 (defn canvas [canvas-width canvas-height grid-size border-width]
   (let [container (dom/getElement "canvas-container")
@@ -63,6 +65,14 @@
     (let [[x y w h] box]
       (draw-box canvas x y w h))))
 
+(defn draw-string
+  ([canvas string x y font-string]
+    (let [ctx (:context canvas)]
+      (set! (. ctx -font) font-string)
+      (.fillText ctx string x y)))
+  ([canvas string x y]
+    (draw-string canvas string x y default-font)))
+
 ;;Game Drawing
 (defn screen-coordinates [grid-size border-width game-coordinates]
   (map #(+ border-width (* grid-size %)) game-coordinates))
@@ -78,10 +88,37 @@
                  [(- width border-width) 0 border-width height]]))))
 
 (defn draw-score [state canvas]
-  (let [ctx (:context canvas)]
-    (set-fill-color canvas (color :white))
-    (set! (. ctx -font) "bold 12px sans-serif")
-    (.fillText ctx (str "Score: " (:length (:snake state))) 0 10)))
+  (set-fill-color canvas (color :white))
+  (draw-string canvas (str "Score: " (:length (:snake state))) 0 10))
+
+(defn erase-message
+  "Hack around the issue demonstrated here: http://jsfiddle.net/6ZKqw/4/
+   Filling white text over text leaves a ghost outline of the text"
+  [state canvas]
+  (let [m (:message state) t (:text m) s (:subtext m)
+        x 230 ty 230 sy 264 tf "bold 24px sans-serif"]
+  (set-fill-color canvas (color :white))
+  (draw-string canvas t (- x 1) ty tf)
+  (draw-string canvas t (+ x 1) ty tf)
+  (draw-string canvas t x (- ty 1) tf)
+  (draw-string canvas t x (+ ty 1) tf)
+  (draw-string canvas s (- x 1) sy)
+  (draw-string canvas s (+ x 1) sy)
+  (draw-string canvas s x (- sy 1))
+  (draw-string canvas s x (+ sy 1))))
+
+(defn draw-message [state canvas]
+  (let [message (:message state)
+        text (:text message)
+        subtext (:subtext message)
+        [color-name modifier] (:color message)]
+    (if message
+      (if (:erase? message)
+        (erase-message state canvas)
+        (do
+          (set-fill-color canvas (color color-name modifier))
+          (draw-string canvas text 230 230 "bold 24px sans-serif")
+          (draw-string canvas subtext 230 264))))))
 
 (defn draw-snake-segment [canvas segment]
   (let [{:keys [grid-size border-width]} canvas
@@ -112,4 +149,5 @@
   (draw-board canvas)
   (draw-score state canvas)
   (draw-snake state canvas)
-  (draw-pellet state canvas))
+  (draw-pellet state canvas)
+  (draw-message state canvas))

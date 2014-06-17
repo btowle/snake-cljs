@@ -47,7 +47,21 @@
     (some #(= (first body) %) (rest body))))
 
 (defn die-on-collision [state]
-  (assoc state :alive? (not (or (collide-wall? state) (collide-self? state)))))
+  (assoc state
+         :alive? (not (or (collide-wall? state) (collide-self? state)))))
+
+(defn change-message [state]
+  (let [message (:message state)
+        color (:color message)]
+    (assoc state
+           :message (if (:alive? state)
+                      (if message
+                        (if (:erase? message)
+                          nil
+                          (assoc message :erase? true)))
+                      {:text " GAME OVER"
+                       :subtext "               R to Restart!"
+                       :color [:red :dark]}))))
 
 (defn valid-pellet [grid-width grid-height snake pellet]
   (not-any? #(= pellet %) (:body snake)))
@@ -99,6 +113,7 @@
       zero-last-update
       move-snake
       die-on-collision
+      change-message
       eat-pellet))
 
 (defn snake [grid-width grid-height]
@@ -118,12 +133,23 @@
      :snake snake
      :pellet (pellet snake grid-width grid-height)
      :direction :none
-     :alive? true}))
+     :alive? true
+     :message {:text "Move To Start!"
+               :subtext "  WASD, Arrows, or Numpad"
+               :color [:blue :dark]
+               :erase? false}}))
+
+(defn reset-game! [canvas state-atom]
+  (clear-board canvas)
+  (reset! state-atom (initial-state))
+  (render @state-atom canvas))
 
 ;;Gameloop/Events
 (defn on-tick [state canvas]
   (swap! state update-time)
-  (if (and (:alive? @state) (> (:last-update (:time @state)) update-latency))
+  (if (and (:alive? @state)
+      (not= :none (:direction @state))
+      (> (:last-update (:time @state)) update-latency))
     (do
       (swap! state update-board)
       (render @state canvas))))
@@ -134,9 +160,7 @@
                           100 :left 104 :up 102 :right 98 :down} ;Numpad
         key-code (. event -keyCode)]
     (if (= key-code 82) ;R
-      (do
-        (clear-board canvas)
-        (reset! state (initial-state))))
+      (reset-game! canvas state))
     (swap! state assoc :direction (or (key-to-direction key-code)
                                       (:direction @state)))))
 
@@ -144,6 +168,7 @@
   (let [canvas (canvas canvas-width canvas-height grid-size border-width)
         timer (goog.Timer. (/ 1000 250))
         state (atom (initial-state))]
+    (render @state canvas)
     (. timer start)
     (events/listen timer
                    goog.Timer/TICK
