@@ -17,4 +17,4 @@
                 :output-to "snake_cljs.js"
                 :output-dir "out"
                 :optimizations :none
-                :source-map true}}]})
+                :source-map "snake_cljs.js.map"}}]})
