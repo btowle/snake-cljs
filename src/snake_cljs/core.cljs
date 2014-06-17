@@ -2,7 +2,7 @@
   (:require [goog.Timer :as timer]
             [goog.events :as events]
             [goog.events.EventType :as event-type]
-            [snake-cljs.rendering :refer [canvas render]]))
+            [snake-cljs.rendering :refer [canvas render clear-board]]))
 
 (def ^:const canvas-width 640)
 (def ^:const canvas-height 480)
@@ -129,11 +129,14 @@
       (render @state canvas))))
 
 (defn on-keydown [state canvas event]
-  (let [key-to-direction {37 :left  65 :left  100 :left
-                          38 :up    87 :up    104 :up
-                          39 :right 68 :right 102 :right
-                          40 :down  83 :down  98 :down}
+  (let [key-to-direction {37  :left 38  :up 39  :right 40 :down  ;Arrows
+                          65  :left 87  :up 68  :right 83 :down  ;WASD
+                          100 :left 104 :up 102 :right 98 :down} ;Numpad
         key-code (. event -keyCode)]
+    (if (= key-code 82) ;R
+      (do
+        (clear-board canvas)
+        (reset! state (initial-state))))
     (swap! state assoc :direction (or (key-to-direction key-code)
                                       (:direction @state)))))
 

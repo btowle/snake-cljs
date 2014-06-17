@@ -45,6 +45,15 @@
       (set-fill-color canvas (rgba-string r g b))
       (set-fill-color canvas (rgba-string r g b (first a))))))
 
+(defn clear-board
+  [canvas]
+  (let [{:keys [border-width height width]} canvas
+        x border-width
+        y x
+        w (- width (* 2 border-width))
+        h (- height (* 2 border-width))]
+    (.clearRect (:context canvas) x y w h)))
+
 (defn draw-box
   ([canvas x y w h]
     (.fillRect (:context canvas) x y w h))
